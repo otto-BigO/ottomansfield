@@ -222,7 +222,11 @@
   // lastSeen is a millisecond timestamp, so this is accurate to the millisecond
   // even though the snapshot only carries whole seconds.
   function liveMs(c) {
-    return Math.max(0, c.remainingSeconds * 1000 - (Date.now() - c.lastSeen));
+    // Counts down from the anchor, which is the moment a client actually saw the
+    // sign change, not from the last time someone walked past it. Falls back to
+    // lastSeen for snapshots written before the two were separated.
+    var anchor = c.anchorAt || c.lastSeen;
+    return Math.max(0, c.remainingSeconds * 1000 - (Date.now() - anchor));
   }
 
   function liveSeconds(c) {

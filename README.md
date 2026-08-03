@@ -27,7 +27,24 @@ python3 -m http.server 8000
 # then open http://localhost:8000
 ```
 
-## deploy checklist (do these yourself)
+## how it is deployed now
+
+the site is served from the mac mini: LXC 103 on the proxmox box, nginx, exposed
+through the existing cloudflare tunnel. push changes with:
+
+```bash
+./deploy.sh            # copy to the box and reload nginx
+./deploy.sh --git      # also commit and push to github first
+```
+
+`/data/celler.json` is not part of this repo's deploy. the celle scanner bot
+writes it straight to `/var/www/celler` on the box and nginx serves that path,
+so the live list updates on its own.
+
+github pages is still set up on the repo as a fallback, but DNS points at the
+tunnel, so the mac mini is what answers.
+
+## original deploy checklist (kept for reference)
 
 the site is static, so it deploys free with a custom domain anywhere:
 

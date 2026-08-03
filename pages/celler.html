@@ -325,27 +325,39 @@
   }
 
   function updateCard(n, c) {
-    n.id.textContent = '';
-    if (c.favourite) {
-      var st = document.createElement('span');
-      st.className = 'star';
-      st.textContent = '\u2605 ';
-      n.id.appendChild(st);
+    var wantId = (c.favourite ? '\u2605 ' : '') + c.id;
+    if (n.id.textContent !== wantId) {
+      n.id.textContent = '';
+      if (c.favourite) {
+        var st = document.createElement('span');
+        st.className = 'star';
+        st.textContent = '\u2605 ';
+        n.id.appendChild(st);
+      }
+      n.id.appendChild(document.createTextNode(c.id));
     }
-    n.id.appendChild(document.createTextNode(c.id));
 
-    n.time.textContent = timeText(c);
-    n.owner.textContent = c.owner || 'no owner';
-    n.seen.textContent = 'seen ' + age(c.lastSeen);
+    var t = timeText(c);
+    if (n.time.textContent !== t) n.time.textContent = t;
+    var o = c.owner || 'no owner';
+    if (n.owner.textContent !== o) n.owner.textContent = o;
+    var sn = 'seen ' + age(c.lastSeen);
+    if (n.seen.textContent !== sn) n.seen.textContent = sn;
 
     var ms = liveMs(c);
     var showBar = c.status !== 'TIL_SALG' && ms > 0;
-    n.bar.style.display = showBar ? '' : 'none';
-    if (showBar) n.fill.style.width = (progress(c) * 100).toFixed(1) + '%';
+    var wantDisplay = showBar ? '' : 'none';
+    if (n.bar.style.display !== wantDisplay) n.bar.style.display = wantDisplay;
+    if (showBar) {
+      var w = (progress(c) * 100).toFixed(1) + '%';
+      if (n.fill.style.width !== w) n.fill.style.width = w;
+    }
 
     var cls = classesFor(c);
     if (n.li.className.indexOf('is-entering') !== -1) cls += ' is-entering';
-    n.li.className = cls;
+    if (n.li.className !== cls) {
+      n.li.className = cls;
+    }
   }
 
   /**
@@ -383,8 +395,15 @@
       }
       lastShown[c.id] = stamp;
 
-      // appendChild on an existing node moves it, keeping state and animations
-      el.rows.appendChild(n.li);
+      // Only move a card when its position actually changed. appendChild on a
+      // node that is already there still counts as a remove and re-insert, which
+      // re-evaluates :hover and restarts every animation on it. Doing that once a
+      // second made the hover lift replay continuously while the pointer sat
+      // still, and chopped up the pulse on the for-sale cards.
+      var atSlot = el.rows.children[i];
+      if (atSlot !== n.li) {
+        el.rows.insertBefore(n.li, atSlot || null);
+      }
 
       if (c.status !== 'TIL_SALG' && liveMs(c) > 0 && liveMs(c) < 60000) {
         ticking.push({ el: n.time, c: c });

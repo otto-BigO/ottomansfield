@@ -40,26 +40,62 @@
     .controls input { flex: 1 1 200px; }
     .controls input:focus, .controls select:focus { outline: 1px solid var(--accent); }
 
-    .celle-table { width: 100%; border-collapse: collapse; font-size: 15px; }
-    .celle-table th {
-      text-align: left; font-family: var(--font-display); font-size: 11px;
-      letter-spacing: .06em; color: var(--muted); font-weight: 400;
-      padding: 6px 8px; border-bottom: 1px solid var(--border);
+    /* cards instead of a table: the countdown gets room to breathe and it
+       collapses to one column on a phone without hiding anything */
+    .celle-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    .celle {
+      display: grid;
+      grid-template-columns: minmax(0,1fr) auto;
+      gap: 2px 14px;
+      align-items: center;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 14px;
     }
-    .celle-table td { padding: 8px; border-bottom: 1px solid var(--border); }
-    .celle-table tr:last-child td { border-bottom: 0; }
-    .c-id { font-family: var(--font-display); font-size: 13px; }
-    .c-owner { color: var(--muted); }
-    .c-age { color: var(--muted); font-size: 13px; white-space: nowrap; }
-    /* dimmed: nobody has actually seen this recently, the countdown is extrapolated */
-    tr.is-stale td { opacity: .45; }
-    tr.is-free .c-time { color: var(--accent); }
-    tr.is-expired .c-time { color: #e0b070; }
+    .celle__id { font-family: var(--font-display); font-size: 14px; letter-spacing: .04em; }
+    .celle__owner { color: var(--muted); font-size: 14px; }
+    /* explicit placement: id over owner on the left, countdown over "seen" on
+       the right, bar across the bottom. left implicit it wrapped onto extra rows. */
+    .celle__id    { grid-column: 1; grid-row: 1; }
+    .celle__owner { grid-column: 1; grid-row: 2; color: var(--muted); font-size: 14px; }
+    .celle__time {
+      grid-column: 2; grid-row: 1;
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+      font-size: 19px;
+      line-height: 1.1;
+      white-space: nowrap;
+    }
+    .celle__seen { grid-column: 2; grid-row: 2; color: var(--muted); font-size: 12px; text-align: right; }
+    .celle__bar  { grid-column: 1 / -1; grid-row: 3; }
+
+    /* a thin bar showing how much of the window is left, so you can read
+       urgency without doing arithmetic on the numbers */
+    .celle__bar { grid-column: 1 / -1; height: 3px; border-radius: 2px; background: var(--border); overflow: hidden; }
+    .celle__bar i { display: block; height: 100%; background: var(--accent); transition: width .5s linear; }
+
+    .celle.is-free { border-left-color: var(--accent); }
+    .celle.is-free .celle__time { color: var(--accent); font-family: var(--font-display); font-size: 15px; }
+    .celle.is-soon { border-left-color: #e0b070; }
+    .celle.is-soon .celle__time { color: #e0b070; }
+    .celle.is-soon .celle__bar i { background: #e0b070; }
+    .celle.is-expired { border-left-color: #c98b8b; }
+    .celle.is-expired .celle__time { color: #c98b8b; font-size: 14px; }
+    /* dimmed: nobody has actually seen this recently, the countdown is a guess */
+    .celle.is-stale { opacity: .5; }
+    .celle.is-stale .celle__time::after { content: ' ?'; color: var(--muted); }
     .star { color: #e0b070; }
 
+    .empty { color: var(--muted); padding: 18px 4px; }
     .note { color: var(--muted); font-size: 14px; margin-top: 14px; }
     .is-error { color: #e08080; }
-    @media (max-width: 560px) { .opt { display: none; } }
+    @media (max-width: 480px) {
+      .celle { grid-template-columns: 1fr; }
+      .celle__time { grid-row: auto; grid-column: 1; text-align: left; }
+      .celle__seen { text-align: left; }
+    }
   </style>
 </head>
 <body>
@@ -101,19 +137,15 @@
         <option value="fav">favourites</option>
         <option value="fresh">recently seen only</option>
       </select>
+      <select id="sort" aria-label="sort">
+        <option value="time">soonest first</option>
+        <option value="id">by celle id</option>
+        <option value="seen">recently seen first</option>
+      </select>
     </div>
 
-    <table class="celle-table">
-      <thead>
-        <tr>
-          <th>celle</th>
-          <th class="opt">owner</th>
-          <th>time</th>
-          <th class="opt">seen</th>
-        </tr>
-      </thead>
-      <tbody id="rows"></tbody>
-    </table>
+    <ul class="celle-list" id="rows"></ul>
+    <p class="empty" id="empty" hidden>ingen celler matcher.</p>
 
     <p class="note" id="note"></p>
 
@@ -139,16 +171,27 @@
     fresh: document.getElementById('freshness'),
     note: document.getElementById('note'),
     q: document.getElementById('q'),
-    filter: document.getElementById('filter')
+    filter: document.getElementById('filter'),
+    sort: document.getElementById('sort'),
+    empty: document.getElementById('empty')
   };
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
+  /**
+   * Countdown that changes resolution as it gets close, so a celle hours out
+   * does not flicker every second, while one about to open shows the seconds
+   * you actually care about.
+   */
   function duration(sec) {
     if (sec <= 0) return '0s';
-    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    var d = Math.floor(sec / 86400);
+    var h = Math.floor((sec % 86400) / 3600);
+    var m = Math.floor((sec % 3600) / 60);
+    var s = sec % 60;
+    if (d > 0) return d + 'd ' + h + 'h';
     if (h > 0) return h + 'h ' + pad(m) + 'm';
-    if (m > 0) return m + 'm ' + pad(s) + 's';
+    if (m > 0) return m + ':' + pad(s);
     return s + 's';
   }
 
@@ -163,10 +206,16 @@
     return Math.floor(hours / 24) + 'd ago';
   }
 
-  // Same extrapolation the mod and the bot use, so the countdown stays live
-  // between snapshots rather than freezing at whatever the last write said.
+  // Same extrapolation the mod and the bot use, so the countdown keeps ticking
+  // between snapshots rather than freezing on whatever the last write said.
   function liveSeconds(c) {
     return Math.max(0, c.remainingSeconds - Math.floor((Date.now() - c.lastSeen) / 1000));
+  }
+
+  /** How full the bar is: 1 when just seen, 0 when the timer runs out. */
+  function progress(c) {
+    if (!c.remainingSeconds) return 0;
+    return Math.max(0, Math.min(1, liveSeconds(c) / c.remainingSeconds));
   }
 
   function keep(c) {
@@ -181,55 +230,74 @@
     }
   }
 
-  function cell(cls, text) {
-    var td = document.createElement('td');
-    td.className = cls;
-    td.textContent = text;
-    return td;
+  function sorted(list) {
+    var by = el.sort.value;
+    return list.slice().sort(function (a, b) {
+      if (by === 'id') return a.id.localeCompare(b.id, 'da');
+      if (by === 'seen') return b.lastSeen - a.lastSeen;
+      // soonest first, with the ones already for sale at the very top
+      var af = a.status === 'TIL_SALG', bf = b.status === 'TIL_SALG';
+      if (af !== bf) return af ? -1 : 1;
+      return liveSeconds(a) - liveSeconds(b);
+    });
+  }
+
+  function div(cls, text) {
+    var d = document.createElement('div');
+    d.className = cls;
+    if (text !== undefined) d.textContent = text;
+    return d;
   }
 
   function render() {
     if (!data) return;
-    var list = data.celler.filter(keep);
+    var list = sorted(data.celler.filter(keep));
 
     el.rows.textContent = '';
-    if (list.length === 0) {
-      var tr = document.createElement('tr');
-      var td = cell('c-owner', 'nothing matches.');
-      td.colSpan = 4;
-      tr.appendChild(td);
-      el.rows.appendChild(tr);
-    }
+    el.empty.hidden = list.length > 0;
 
     list.forEach(function (c) {
       var live = liveSeconds(c);
       var expired = c.status !== 'TIL_SALG' && live <= 0;
+      var free = c.status === 'TIL_SALG';
+      // under an hour and still counting: worth flagging
+      var soon = !free && !expired && live <= 3600;
 
-      var tr = document.createElement('tr');
-      if (c.stale) tr.className = 'is-stale';
-      else if (c.status === 'TIL_SALG') tr.className = 'is-free';
-      else if (expired) tr.className = 'is-expired';
+      var li = document.createElement('li');
+      li.className = 'celle'
+        + (free ? ' is-free' : '')
+        + (soon ? ' is-soon' : '')
+        + (expired ? ' is-expired' : '')
+        + (c.stale ? ' is-stale' : '');
 
-      var id = document.createElement('td');
-      id.className = 'c-id';
+      var id = div('celle__id');
       if (c.favourite) {
-        var star = document.createElement('span');
-        star.className = 'star';
-        star.textContent = '★ ';
-        id.appendChild(star);
+        var st = document.createElement('span');
+        st.className = 'star';
+        st.textContent = '\u2605 ';
+        id.appendChild(st);
       }
       id.appendChild(document.createTextNode(c.id));
 
       var time;
-      if (c.status === 'TIL_SALG') time = 'for sale now';
-      else if (expired) time = 'expired? unconfirmed';
+      if (free) time = 'for sale now';
+      else if (expired) time = 'expired?';
       else time = (c.confirmed ? '' : '~') + duration(live);
 
-      tr.appendChild(id);
-      tr.appendChild(cell('c-owner opt', c.owner || '—'));
-      tr.appendChild(cell('c-time', time));
-      tr.appendChild(cell('c-age opt', age(c.lastSeen)));
-      el.rows.appendChild(tr);
+      li.appendChild(id);
+      li.appendChild(div('celle__time', time));
+      li.appendChild(div('celle__owner', c.owner || 'no owner'));
+      li.appendChild(div('celle__seen', 'seen ' + age(c.lastSeen)));
+
+      if (!free && !expired) {
+        var bar = div('celle__bar');
+        var fill = document.createElement('i');
+        fill.style.width = (progress(c) * 100).toFixed(1) + '%';
+        bar.appendChild(fill);
+        li.appendChild(bar);
+      }
+
+      el.rows.appendChild(li);
     });
 
     el.stats.textContent = '';
@@ -238,19 +306,19 @@
       ['', 'known', data.counts.total],
       ['', 'not seen recently', data.counts.stale],
       ['', 'favourites', data.counts.favourites]
-    ].forEach(function (s) {
+    ].forEach(function (st) {
       var li = document.createElement('li');
-      li.className = 'stat ' + s[0];
-      li.appendChild(document.createTextNode(s[1] + ': '));
+      li.className = 'stat ' + st[0];
+      li.appendChild(document.createTextNode(st[1] + ': '));
       var b = document.createElement('b');
-      b.textContent = s[2];
+      b.textContent = st[2];
       li.appendChild(b);
       el.stats.appendChild(li);
     });
 
     el.fresh.textContent = 'last scan ' + age(data.newestSighting) + '.';
     el.note.textContent = 'updated ' + age(data.generatedAt)
-      + '. dimmed rows have not been seen recently, so their countdown is estimated.';
+      + '. dimmed entries have not been seen recently, so their countdown is estimated.';
   }
 
   function load() {
@@ -268,6 +336,7 @@
 
   el.q.addEventListener('input', render);
   el.filter.addEventListener('change', render);
+  el.sort.addEventListener('change', render);
   load();
   setInterval(load, 60000);   // fetch a newer snapshot
   setInterval(render, 1000);  // keep countdowns ticking in between

@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "generatedAt": 1785768843064,
+  "generatedAt": 1785778072535,
   "newestSighting": null,
   "window": {
-    "minHours": 0,
-    "maxHours": 48
+    "minHours": null,
+    "maxHours": null
   },
   "counts": {
     "total": 0,

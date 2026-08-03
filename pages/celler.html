@@ -28,6 +28,7 @@
     .stat {
       background: var(--panel); border: 1px solid var(--border);
       border-radius: 6px; padding: 5px 10px; font-size: 14px; color: var(--muted);
+      transition: border-color .25s ease, color .25s ease;
     }
     .stat b { color: var(--ink); font-weight: 500; }
     .stat.is-free b { color: var(--accent); }
@@ -36,76 +37,88 @@
     .controls input, .controls select {
       background: var(--panel); border: 1px solid var(--border); color: var(--ink);
       border-radius: 6px; padding: 7px 10px; font-family: var(--font-body); font-size: 15px;
+      transition: border-color .18s ease, box-shadow .18s ease;
     }
     .controls input { flex: 1 1 200px; }
-    .controls input:focus, .controls select:focus { outline: 1px solid var(--accent); }
+    .controls input:hover, .controls select:hover { border-color: var(--muted); }
+    .controls input:focus, .controls select:focus {
+      outline: none; border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(126, 199, 194, .18);
+    }
 
-    /* cards instead of a table: the countdown gets room to breathe and it
-       collapses to one column on a phone without hiding anything */
-    .celle-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    /* three across, falling back on narrower screens */
+    .celle-list {
+      list-style: none; margin: 0; padding: 0;
+      display: grid; gap: 10px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    @media (max-width: 900px) { .celle-list { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 560px) { .celle-list { grid-template-columns: 1fr; } }
+
+    /* stacked inside the card, because a column this narrow has no room for
+       two sides. reads top to bottom: which celle, how long, who, how fresh. */
     .celle {
-      display: grid;
-      grid-template-columns: minmax(0,1fr) auto;
-      gap: 2px 14px;
-      align-items: center;
+      display: flex; flex-direction: column; gap: 2px;
       background: var(--panel);
       border: 1px solid var(--border);
       border-left: 3px solid var(--border);
       border-radius: 8px;
-      padding: 9px 14px;
+      padding: 10px 12px;
+      transition: transform .16s ease, border-color .2s ease, background .2s ease;
+      will-change: transform;
     }
-    /* ids are read character by character, so they use a mono face rather than
-       the pixel display font. In Silkscreen at this size C-19 reads as C-13 and
-       0/O and 5/S are nearly identical. */
+    .celle:hover { transform: translateY(-2px); border-color: var(--muted); }
+
     .celle__id {
       font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-      font-size: 16px;
-      font-weight: 600;
-      letter-spacing: .02em;
-      font-variant-numeric: tabular-nums;
-      color: var(--ink);
+      font-size: 15px; font-weight: 600; letter-spacing: .02em; color: var(--ink);
     }
-    .celle__owner { color: var(--muted); font-size: 14px; }
-    /* explicit placement: id over owner on the left, countdown over "seen" on
-       the right, bar across the bottom. left implicit it wrapped onto extra rows. */
-    .celle__id    { grid-column: 1; grid-row: 1; }
-    .celle__owner { grid-column: 1; grid-row: 2; color: var(--muted); font-size: 14px; }
     .celle__time {
-      grid-column: 2; grid-row: 1;
-      text-align: right;
       font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
       font-variant-numeric: tabular-nums;
-      font-size: 19px;
-      line-height: 1.1;
-      white-space: nowrap;
+      font-size: 21px; line-height: 1.15; white-space: nowrap; margin-top: 2px;
     }
-    .celle__seen { grid-column: 2; grid-row: 2; color: var(--muted); font-size: 12px; text-align: right; }
-    .celle__bar  { grid-column: 1 / -1; grid-row: 3; }
+    .celle__owner { color: var(--muted); font-size: 13px; }
+    .celle__seen  { color: var(--muted); font-size: 12px; }
 
-    /* a thin bar showing how much of the window is left, so you can read
-       urgency without doing arithmetic on the numbers */
-    .celle__bar { grid-column: 1 / -1; height: 3px; border-radius: 2px; background: var(--border); overflow: hidden; }
-    .celle__bar i { display: block; height: 100%; background: var(--accent); transition: width .5s linear; }
+    .celle__bar { height: 3px; border-radius: 2px; background: var(--border); overflow: hidden; margin-top: 8px; }
+    .celle__bar i { display: block; height: 100%; background: var(--accent); transition: width .6s linear; }
 
     .celle.is-free { border-left-color: var(--accent); }
-    .celle.is-free .celle__time { color: var(--accent); font-size: 16px; font-weight: 500; letter-spacing: .01em; }
+    .celle.is-free .celle__time { color: var(--accent); font-size: 17px; }
     .celle.is-soon { border-left-color: #e0b070; }
     .celle.is-soon .celle__time { color: #e0b070; }
     .celle.is-soon .celle__bar i { background: #e0b070; }
     .celle.is-expired { border-left-color: #c98b8b; }
-    .celle.is-expired .celle__time { color: #c98b8b; font-size: 14px; }
-    /* dimmed: nobody has actually seen this recently, the countdown is a guess */
+    .celle.is-expired .celle__time { color: #c98b8b; font-size: 15px; }
+    /* dimmed: nobody has seen it recently, so the countdown is a guess */
     .celle.is-stale { opacity: .5; }
     .celle.is-stale .celle__time::after { content: ' ?'; color: var(--muted); }
     .star { color: #e0b070; }
 
+    /* a card appearing for the first time, not on every re-render */
+    @keyframes celle-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+    .celle.is-entering { animation: celle-in .28s ease both; }
+
+    /* something about this celle actually changed, worth a glance */
+    @keyframes celle-flash {
+      0%   { background: rgba(126, 199, 194, .16); }
+      100% { background: var(--panel); }
+    }
+    .celle.is-changed { animation: celle-flash 1.1s ease-out; }
+
+    /* a celle that is buyable right now should pull the eye, gently */
+    @keyframes free-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .62; } }
+    .celle.is-free .celle__time { animation: free-pulse 2.4s ease-in-out infinite; }
+
     .empty { color: var(--muted); padding: 18px 4px; }
     .note { color: var(--muted); font-size: 14px; margin-top: 14px; }
     .is-error { color: #e08080; }
-    @media (max-width: 480px) {
-      .celle { grid-template-columns: 1fr; }
-      .celle__time { grid-row: auto; grid-column: 1; text-align: left; }
-      .celle__seen { text-align: left; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .celle, .celle__bar i, .stat, .controls input, .controls select { transition: none; }
+      .celle.is-entering, .celle.is-changed, .celle.is-free .celle__time { animation: none; }
+      .celle:hover { transform: none; }
     }
   </style>
 </head>
@@ -171,25 +184,49 @@
   'use strict';
 
   var DATA_URL = '/data/celler.json';
+  var STORE_KEY = 'celler.view';
+
   var data = null;
   var el = {
     rows: document.getElementById('rows'),
+    empty: document.getElementById('empty'),
     stats: document.getElementById('stats'),
     fresh: document.getElementById('freshness'),
     note: document.getElementById('note'),
     q: document.getElementById('q'),
     filter: document.getElementById('filter'),
-    sort: document.getElementById('sort'),
-    empty: document.getElementById('empty')
+    sort: document.getElementById('sort')
   };
+
+  /** Live card nodes keyed by celle id, so they are updated rather than rebuilt. */
+  var nodes = {};
+  /** What each card last displayed, to know when something genuinely changed. */
+  var lastShown = {};
+  var ticking = [];
+
+  // --- remembering the view -------------------------------------------------
+
+  function saveView() {
+    try {
+      localStorage.setItem(STORE_KEY, JSON.stringify({
+        q: el.q.value, filter: el.filter.value, sort: el.sort.value
+      }));
+    } catch (e) { /* private mode, not worth breaking over */ }
+  }
+
+  function restoreView() {
+    try {
+      var v = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+      if (typeof v.q === 'string') el.q.value = v.q;
+      if (v.filter) el.filter.value = v.filter;
+      if (v.sort) el.sort.value = v.sort;
+    } catch (e) { /* ignore a corrupt entry */ }
+  }
+
+  // --- formatting -----------------------------------------------------------
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
-  /**
-   * Countdown that changes resolution as it gets close, so a celle hours out
-   * does not flicker every second, while one about to open shows the seconds
-   * you actually care about.
-   */
   function duration(ms) {
     if (ms <= 0) return '0.00s';
     var total = Math.floor(ms / 1000);
@@ -198,10 +235,8 @@
     var m = Math.floor((total % 3600) / 60);
     var s = total % 60;
     if (d > 0) return d + 'd ' + h + 'h';
-    // under an hour the seconds matter, so they are always shown
     if (h > 0) return h + 'h ' + pad(m) + 'm ' + pad(s) + 's';
     if (m > 0) return m + ':' + pad(s);
-    // last minute: hundredths, because this is the part you actually race
     var cs = Math.floor((ms % 1000) / 10);
     return s + '.' + pad(cs) + 's';
   }
@@ -217,27 +252,38 @@
     return Math.floor(hours / 24) + 'd ago';
   }
 
-  // Same extrapolation the mod and the bot use, so the countdown keeps ticking
-  // between snapshots rather than freezing on whatever the last write said.
-  // lastSeen is a millisecond timestamp, so this is accurate to the millisecond
-  // even though the snapshot only carries whole seconds.
+  // Counts down from the anchor, the moment a client actually saw the sign
+  // change, not from the last time anyone walked past it.
   function liveMs(c) {
-    // Counts down from the anchor, which is the moment a client actually saw the
-    // sign change, not from the last time someone walked past it. Falls back to
-    // lastSeen for snapshots written before the two were separated.
     var anchor = c.anchorAt || c.lastSeen;
     return Math.max(0, c.remainingSeconds * 1000 - (Date.now() - anchor));
   }
 
-  function liveSeconds(c) {
-    return Math.floor(liveMs(c) / 1000);
-  }
-
-  /** How full the bar is: 1 when just seen, 0 when the timer runs out. */
   function progress(c) {
     if (!c.remainingSeconds) return 0;
     return Math.max(0, Math.min(1, liveMs(c) / (c.remainingSeconds * 1000)));
   }
+
+  function timeText(c) {
+    var ms = liveMs(c);
+    if (c.status === 'TIL_SALG') return 'for sale now';
+    if (ms <= 0) return 'expired?';
+    return (c.confirmed ? '' : '~') + duration(ms);
+  }
+
+  function classesFor(c) {
+    var ms = liveMs(c);
+    var free = c.status === 'TIL_SALG';
+    var expired = !free && ms <= 0;
+    var soon = !free && !expired && ms <= 3600000;
+    return 'celle'
+      + (free ? ' is-free' : '')
+      + (soon ? ' is-soon' : '')
+      + (expired ? ' is-expired' : '')
+      + (c.stale ? ' is-stale' : '');
+  }
+
+  // --- filtering and ordering ----------------------------------------------
 
   function keep(c) {
     var q = el.q.value.trim().toLowerCase();
@@ -256,84 +302,108 @@
     return list.slice().sort(function (a, b) {
       if (by === 'id') return a.id.localeCompare(b.id, 'da');
       if (by === 'seen') return b.lastSeen - a.lastSeen;
-      // soonest first, with the ones already for sale at the very top
       var af = a.status === 'TIL_SALG', bf = b.status === 'TIL_SALG';
       if (af !== bf) return af ? -1 : 1;
-      return liveSeconds(a) - liveSeconds(b);
+      return liveMs(a) - liveMs(b);
     });
   }
 
-  function div(cls, text) {
-    var d = document.createElement('div');
-    d.className = cls;
-    if (text !== undefined) d.textContent = text;
-    return d;
+  // --- rendering ------------------------------------------------------------
+
+  function buildCard(c) {
+    var li = document.createElement('li');
+    var id    = document.createElement('div'); id.className = 'celle__id';
+    var time  = document.createElement('div'); time.className = 'celle__time';
+    var owner = document.createElement('div'); owner.className = 'celle__owner';
+    var seen  = document.createElement('div'); seen.className = 'celle__seen';
+    var bar   = document.createElement('div'); bar.className = 'celle__bar';
+    var fill  = document.createElement('i');
+    bar.appendChild(fill);
+    li.appendChild(id); li.appendChild(time); li.appendChild(owner);
+    li.appendChild(seen); li.appendChild(bar);
+    return { li: li, id: id, time: time, owner: owner, seen: seen, bar: bar, fill: fill };
   }
 
-  // Nodes that still need a sub-second countdown, refreshed by fastTick.
-  var ticking = [];
+  function updateCard(n, c) {
+    n.id.textContent = '';
+    if (c.favourite) {
+      var st = document.createElement('span');
+      st.className = 'star';
+      st.textContent = '\u2605 ';
+      n.id.appendChild(st);
+    }
+    n.id.appendChild(document.createTextNode(c.id));
 
-  function timeText(c) {
+    n.time.textContent = timeText(c);
+    n.owner.textContent = c.owner || 'no owner';
+    n.seen.textContent = 'seen ' + age(c.lastSeen);
+
     var ms = liveMs(c);
-    if (c.status === 'TIL_SALG') return 'for sale now';
-    if (ms <= 0) return 'expired?';
-    return (c.confirmed ? '' : '~') + duration(ms);
+    var showBar = c.status !== 'TIL_SALG' && ms > 0;
+    n.bar.style.display = showBar ? '' : 'none';
+    if (showBar) n.fill.style.width = (progress(c) * 100).toFixed(1) + '%';
+
+    var cls = classesFor(c);
+    if (n.li.className.indexOf('is-entering') !== -1) cls += ' is-entering';
+    n.li.className = cls;
   }
 
+  /**
+   * Cards are kept and updated rather than rebuilt every second. Rebuilding
+   * restarted every animation once a second, so nothing could ever animate, and
+   * it threw away the browser's work for no reason.
+   */
   function render() {
     if (!data) return;
     var list = sorted(data.celler.filter(keep));
-
+    var present = {};
     ticking = [];
-    el.rows.textContent = '';
+
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i];
+      present[c.id] = true;
+      var n = nodes[c.id];
+      var isNew = !n;
+      if (isNew) {
+        n = buildCard(c);
+        nodes[c.id] = n;
+        n.li.className = 'celle is-entering';
+        (function (node) {
+          setTimeout(function () { node.li.classList.remove('is-entering'); }, 320);
+        })(n);
+      }
+      updateCard(n, c);
+
+      // flash only when the meaningful state changed, not on every tick
+      var stamp = c.status + '|' + (c.owner || '') + '|' + (c.favourite ? 1 : 0);
+      if (!isNew && lastShown[c.id] && lastShown[c.id] !== stamp) {
+        n.li.classList.remove('is-changed');
+        void n.li.offsetWidth;            // restart the animation
+        n.li.classList.add('is-changed');
+      }
+      lastShown[c.id] = stamp;
+
+      // appendChild on an existing node moves it, keeping state and animations
+      el.rows.appendChild(n.li);
+
+      if (c.status !== 'TIL_SALG' && liveMs(c) > 0 && liveMs(c) < 60000) {
+        ticking.push({ el: n.time, c: c });
+      }
+    }
+
+    for (var key in nodes) {
+      if (!present[key]) {
+        if (nodes[key].li.parentNode) nodes[key].li.parentNode.removeChild(nodes[key].li);
+        delete nodes[key];
+        delete lastShown[key];
+      }
+    }
+
     el.empty.hidden = list.length > 0;
+    renderStats();
+  }
 
-    list.forEach(function (c) {
-      var ms = liveMs(c);
-      var live = Math.floor(ms / 1000);
-      var expired = c.status !== 'TIL_SALG' && ms <= 0;
-      var free = c.status === 'TIL_SALG';
-      // under an hour and still counting: worth flagging
-      var soon = !free && !expired && live <= 3600;
-
-      var li = document.createElement('li');
-      li.className = 'celle'
-        + (free ? ' is-free' : '')
-        + (soon ? ' is-soon' : '')
-        + (expired ? ' is-expired' : '')
-        + (c.stale ? ' is-stale' : '');
-
-      var id = div('celle__id');
-      if (c.favourite) {
-        var st = document.createElement('span');
-        st.className = 'star';
-        st.textContent = '\u2605 ';
-        id.appendChild(st);
-      }
-      id.appendChild(document.createTextNode(c.id));
-
-      var timeEl = div('celle__time', timeText(c));
-      // only the last minute needs faster than 1 Hz
-      if (!free && !expired && ms < 60000) {
-        ticking.push({ el: timeEl, c: c });
-      }
-
-      li.appendChild(id);
-      li.appendChild(timeEl);
-      li.appendChild(div('celle__owner', c.owner || 'no owner'));
-      li.appendChild(div('celle__seen', 'seen ' + age(c.lastSeen)));
-
-      if (!free && !expired) {
-        var bar = div('celle__bar');
-        var fill = document.createElement('i');
-        fill.style.width = (progress(c) * 100).toFixed(1) + '%';
-        bar.appendChild(fill);
-        li.appendChild(bar);
-      }
-
-      el.rows.appendChild(li);
-    });
-
+  function renderStats() {
     el.stats.textContent = '';
     [
       ['is-free', 'for sale', data.counts.forSale],
@@ -355,6 +425,13 @@
       + '. dimmed entries have not been seen recently, so their countdown is estimated.';
   }
 
+  /** Only the last minute needs faster than 1 Hz. */
+  function fastTick() {
+    for (var i = 0; i < ticking.length; i++) {
+      ticking[i].el.textContent = timeText(ticking[i].c);
+    }
+  }
+
   function load() {
     fetch(DATA_URL + '?t=' + Date.now(), { cache: 'no-store' })
       .then(function (r) {
@@ -368,24 +445,17 @@
       });
   }
 
-  el.q.addEventListener('input', render);
-  el.filter.addEventListener('change', render);
-  el.sort.addEventListener('change', render);
-  /**
-   * Updates only the entries inside their last minute. A full re-render at this
-   * rate would rebuild the whole list 20 times a second for no reason, and the
-   * list order does not change meaningfully inside one second anyway.
-   */
-  function fastTick() {
-    for (var i = 0; i < ticking.length; i++) {
-      ticking[i].el.textContent = timeText(ticking[i].c);
-    }
-  }
+  function onControlChange() { saveView(); render(); }
 
+  el.q.addEventListener('input', onControlChange);
+  el.filter.addEventListener('change', onControlChange);
+  el.sort.addEventListener('change', onControlChange);
+
+  restoreView();
   load();
-  setInterval(load, 60000);   // fetch a newer snapshot
-  setInterval(render, 1000);  // full re-render: ordering, classes, bars
-  setInterval(fastTick, 50);  // hundredths for anything in its last minute
+  setInterval(load, 60000);
+  setInterval(render, 1000);
+  setInterval(fastTick, 50);
 })();
 </script>
 </body>

@@ -117,6 +117,8 @@
     <h1 class="wordmark">ottomansfield</h1>
     <nav class="nav" aria-label="main">
       <a href="/">home</a>
+      <span class="sep" aria-hidden="true">·</span>
+      <a href="/pages/celler.html" class="active">celler</a>
     </nav>
   </header>
   <!-- HEADER END  ============================================== -->
@@ -188,16 +190,20 @@
    * does not flicker every second, while one about to open shows the seconds
    * you actually care about.
    */
-  function duration(sec) {
-    if (sec <= 0) return '0s';
-    var d = Math.floor(sec / 86400);
-    var h = Math.floor((sec % 86400) / 3600);
-    var m = Math.floor((sec % 3600) / 60);
-    var s = sec % 60;
+  function duration(ms) {
+    if (ms <= 0) return '0.00s';
+    var total = Math.floor(ms / 1000);
+    var d = Math.floor(total / 86400);
+    var h = Math.floor((total % 86400) / 3600);
+    var m = Math.floor((total % 3600) / 60);
+    var s = total % 60;
     if (d > 0) return d + 'd ' + h + 'h';
-    if (h > 0) return h + 'h ' + pad(m) + 'm';
+    // under an hour the seconds matter, so they are always shown
+    if (h > 0) return h + 'h ' + pad(m) + 'm ' + pad(s) + 's';
     if (m > 0) return m + ':' + pad(s);
-    return s + 's';
+    // last minute: hundredths, because this is the part you actually race
+    var cs = Math.floor((ms % 1000) / 10);
+    return s + '.' + pad(cs) + 's';
   }
 
   function age(ts) {
@@ -213,14 +219,20 @@
 
   // Same extrapolation the mod and the bot use, so the countdown keeps ticking
   // between snapshots rather than freezing on whatever the last write said.
+  // lastSeen is a millisecond timestamp, so this is accurate to the millisecond
+  // even though the snapshot only carries whole seconds.
+  function liveMs(c) {
+    return Math.max(0, c.remainingSeconds * 1000 - (Date.now() - c.lastSeen));
+  }
+
   function liveSeconds(c) {
-    return Math.max(0, c.remainingSeconds - Math.floor((Date.now() - c.lastSeen) / 1000));
+    return Math.floor(liveMs(c) / 1000);
   }
 
   /** How full the bar is: 1 when just seen, 0 when the timer runs out. */
   function progress(c) {
     if (!c.remainingSeconds) return 0;
-    return Math.max(0, Math.min(1, liveSeconds(c) / c.remainingSeconds));
+    return Math.max(0, Math.min(1, liveMs(c) / (c.remainingSeconds * 1000)));
   }
 
   function keep(c) {
@@ -254,16 +266,28 @@
     return d;
   }
 
+  // Nodes that still need a sub-second countdown, refreshed by fastTick.
+  var ticking = [];
+
+  function timeText(c) {
+    var ms = liveMs(c);
+    if (c.status === 'TIL_SALG') return 'for sale now';
+    if (ms <= 0) return 'expired?';
+    return (c.confirmed ? '' : '~') + duration(ms);
+  }
+
   function render() {
     if (!data) return;
     var list = sorted(data.celler.filter(keep));
 
+    ticking = [];
     el.rows.textContent = '';
     el.empty.hidden = list.length > 0;
 
     list.forEach(function (c) {
-      var live = liveSeconds(c);
-      var expired = c.status !== 'TIL_SALG' && live <= 0;
+      var ms = liveMs(c);
+      var live = Math.floor(ms / 1000);
+      var expired = c.status !== 'TIL_SALG' && ms <= 0;
       var free = c.status === 'TIL_SALG';
       // under an hour and still counting: worth flagging
       var soon = !free && !expired && live <= 3600;
@@ -284,13 +308,14 @@
       }
       id.appendChild(document.createTextNode(c.id));
 
-      var time;
-      if (free) time = 'for sale now';
-      else if (expired) time = 'expired?';
-      else time = (c.confirmed ? '' : '~') + duration(live);
+      var timeEl = div('celle__time', timeText(c));
+      // only the last minute needs faster than 1 Hz
+      if (!free && !expired && ms < 60000) {
+        ticking.push({ el: timeEl, c: c });
+      }
 
       li.appendChild(id);
-      li.appendChild(div('celle__time', time));
+      li.appendChild(timeEl);
       li.appendChild(div('celle__owner', c.owner || 'no owner'));
       li.appendChild(div('celle__seen', 'seen ' + age(c.lastSeen)));
 
@@ -342,9 +367,21 @@
   el.q.addEventListener('input', render);
   el.filter.addEventListener('change', render);
   el.sort.addEventListener('change', render);
+  /**
+   * Updates only the entries inside their last minute. A full re-render at this
+   * rate would rebuild the whole list 20 times a second for no reason, and the
+   * list order does not change meaningfully inside one second anyway.
+   */
+  function fastTick() {
+    for (var i = 0; i < ticking.length; i++) {
+      ticking[i].el.textContent = timeText(ticking[i].c);
+    }
+  }
+
   load();
   setInterval(load, 60000);   // fetch a newer snapshot
-  setInterval(render, 1000);  // keep countdowns ticking in between
+  setInterval(render, 1000);  // full re-render: ordering, classes, bars
+  setInterval(fastTick, 50);  // hundredths for anything in its last minute
 })();
 </script>
 </body>

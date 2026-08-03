@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>celler ~ Ottomansfield</title>
+  <meta name="description" content="live celle list from the freakyville celle scanner, merged from every client running the mod.">
+
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon-16.png">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="celler ~ Ottomansfield">
+  <meta property="og:description" content="live celle list from the freakyville celle scanner.">
+  <meta property="og:url" content="https://ottomansfield.com/pages/celler.html">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/style.css">
+
+  <style>
+    /* page-only styles. everything themeable still comes from :root in style.css */
+    .stat-row { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; padding: 0; list-style: none; }
+    .stat {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 6px; padding: 5px 10px; font-size: 14px; color: var(--muted);
+    }
+    .stat b { color: var(--ink); font-weight: 500; }
+    .stat.is-free b { color: var(--accent); }
+
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; }
+    .controls input, .controls select {
+      background: var(--panel); border: 1px solid var(--border); color: var(--ink);
+      border-radius: 6px; padding: 7px 10px; font-family: var(--font-body); font-size: 15px;
+    }
+    .controls input { flex: 1 1 200px; }
+    .controls input:focus, .controls select:focus { outline: 1px solid var(--accent); }
+
+    .celle-table { width: 100%; border-collapse: collapse; font-size: 15px; }
+    .celle-table th {
+      text-align: left; font-family: var(--font-display); font-size: 11px;
+      letter-spacing: .06em; color: var(--muted); font-weight: 400;
+      padding: 6px 8px; border-bottom: 1px solid var(--border);
+    }
+    .celle-table td { padding: 8px; border-bottom: 1px solid var(--border); }
+    .celle-table tr:last-child td { border-bottom: 0; }
+    .c-id { font-family: var(--font-display); font-size: 13px; }
+    .c-owner { color: var(--muted); }
+    .c-age { color: var(--muted); font-size: 13px; white-space: nowrap; }
+    /* dimmed: nobody has actually seen this recently, the countdown is extrapolated */
+    tr.is-stale td { opacity: .45; }
+    tr.is-free .c-time { color: var(--accent); }
+    tr.is-expired .c-time { color: #e0b070; }
+    .star { color: #e0b070; }
+
+    .note { color: var(--muted); font-size: 14px; margin-top: 14px; }
+    .is-error { color: #e08080; }
+    @media (max-width: 560px) { .opt { display: none; } }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER START  ============================================ -->
+  <header class="site-header">
+    <h1 class="wordmark">ottomansfield</h1>
+    <nav class="nav" aria-label="main">
+      <a href="/">home</a>
+      <span class="sep" aria-hidden="true">·</span>
+      <a href="/pages/about.html">about</a>
+      <span class="sep" aria-hidden="true">·</span>
+      <a href="/pages/music.html">music</a>
+      <span class="sep" aria-hidden="true">·</span>
+      <a href="/pages/projects.html">projects</a>
+    </nav>
+  </header>
+  <!-- HEADER END  ============================================== -->
+
+  <main>
+
+    <section class="box" aria-labelledby="celler-h">
+      <div class="box__title" id="celler-h">celler</div>
+      <div class="box__body">
+        <p>live list from the freakyville celle scanner, merged from everyone
+           running the mod. <span id="freshness">loading…</span></p>
+      </div>
+    </section>
+
+    <ul class="stat-row" id="stats"></ul>
+
+    <div class="controls">
+      <input type="search" id="q" placeholder="search celle or owner…" autocomplete="off" aria-label="search">
+      <select id="filter" aria-label="filter">
+        <option value="all">all</option>
+        <option value="free">for sale now</option>
+        <option value="soon">sold / counting down</option>
+        <option value="fav">favourites</option>
+        <option value="fresh">recently seen only</option>
+      </select>
+    </div>
+
+    <table class="celle-table">
+      <thead>
+        <tr>
+          <th>celle</th>
+          <th class="opt">owner</th>
+          <th>time</th>
+          <th class="opt">seen</th>
+        </tr>
+      </thead>
+      <tbody id="rows"></tbody>
+    </table>
+
+    <p class="note" id="note"></p>
+
+  </main>
+
+  <!-- FOOTER START  ============================================ -->
+  <footer class="site-footer">
+    <p>coded by hand, 2026 &middot; <a href="/pages/about.html">about</a></p>
+  </footer>
+  <!-- FOOTER END  ============================================== -->
+
+</div><!-- /.wrap -->
+
+<script>
+(function () {
+  'use strict';
+
+  var DATA_URL = '/data/celler.json';
+  var data = null;
+  var el = {
+    rows: document.getElementById('rows'),
+    stats: document.getElementById('stats'),
+    fresh: document.getElementById('freshness'),
+    note: document.getElementById('note'),
+    q: document.getElementById('q'),
+    filter: document.getElementById('filter')
+  };
+
+  function pad(n) { return n < 10 ? '0' + n : '' + n; }
+
+  function duration(sec) {
+    if (sec <= 0) return '0s';
+    var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+    if (h > 0) return h + 'h ' + pad(m) + 'm';
+    if (m > 0) return m + 'm ' + pad(s) + 's';
+    return s + 's';
+  }
+
+  function age(ts) {
+    if (!ts) return 'unknown';
+    var ms = Date.now() - ts;
+    if (ms < 60000) return 'just now';
+    var mins = Math.floor(ms / 60000);
+    if (mins < 60) return mins + 'm ago';
+    var hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + 'h ago';
+    return Math.floor(hours / 24) + 'd ago';
+  }
+
+  // Same extrapolation the mod and the bot use, so the countdown stays live
+  // between snapshots rather than freezing at whatever the last write said.
+  function liveSeconds(c) {
+    return Math.max(0, c.remainingSeconds - Math.floor((Date.now() - c.lastSeen) / 1000));
+  }
+
+  function keep(c) {
+    var q = el.q.value.trim().toLowerCase();
+    if (q && (c.id + ' ' + (c.owner || '')).toLowerCase().indexOf(q) === -1) return false;
+    switch (el.filter.value) {
+      case 'free':  return c.status === 'TIL_SALG';
+      case 'soon':  return c.status !== 'TIL_SALG';
+      case 'fav':   return !!c.favourite;
+      case 'fresh': return !c.stale;
+      default:      return true;
+    }
+  }
+
+  function cell(cls, text) {
+    var td = document.createElement('td');
+    td.className = cls;
+    td.textContent = text;
+    return td;
+  }
+
+  function render() {
+    if (!data) return;
+    var list = data.celler.filter(keep);
+
+    el.rows.textContent = '';
+    if (list.length === 0) {
+      var tr = document.createElement('tr');
+      var td = cell('c-owner', 'nothing matches.');
+      td.colSpan = 4;
+      tr.appendChild(td);
+      el.rows.appendChild(tr);
+    }
+
+    list.forEach(function (c) {
+      var live = liveSeconds(c);
+      var expired = c.status !== 'TIL_SALG' && live <= 0;
+
+      var tr = document.createElement('tr');
+      if (c.stale) tr.className = 'is-stale';
+      else if (c.status === 'TIL_SALG') tr.className = 'is-free';
+      else if (expired) tr.className = 'is-expired';
+
+      var id = document.createElement('td');
+      id.className = 'c-id';
+      if (c.favourite) {
+        var star = document.createElement('span');
+        star.className = 'star';
+        star.textContent = '★ ';
+        id.appendChild(star);
+      }
+      id.appendChild(document.createTextNode(c.id));
+
+      var time;
+      if (c.status === 'TIL_SALG') time = 'for sale now';
+      else if (expired) time = 'expired? unconfirmed';
+      else time = (c.confirmed ? '' : '~') + duration(live);
+
+      tr.appendChild(id);
+      tr.appendChild(cell('c-owner opt', c.owner || '—'));
+      tr.appendChild(cell('c-time', time));
+      tr.appendChild(cell('c-age opt', age(c.lastSeen)));
+      el.rows.appendChild(tr);
+    });
+
+    el.stats.textContent = '';
+    [
+      ['is-free', 'for sale', data.counts.forSale],
+      ['', 'known', data.counts.total],
+      ['', 'not seen recently', data.counts.stale],
+      ['', 'favourites', data.counts.favourites]
+    ].forEach(function (s) {
+      var li = document.createElement('li');
+      li.className = 'stat ' + s[0];
+      li.appendChild(document.createTextNode(s[1] + ': '));
+      var b = document.createElement('b');
+      b.textContent = s[2];
+      li.appendChild(b);
+      el.stats.appendChild(li);
+    });
+
+    el.fresh.textContent = 'last scan ' + age(data.newestSighting) + '.';
+    el.note.textContent = 'updated ' + age(data.generatedAt)
+      + '. dimmed rows have not been seen recently, so their countdown is estimated.';
+  }
+
+  function load() {
+    fetch(DATA_URL + '?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function (j) { data = j; render(); })
+      .catch(function (e) {
+        el.fresh.className = 'is-error';
+        el.fresh.textContent = 'could not load data (' + e.message + ').';
+      });
+  }
+
+  el.q.addEventListener('input', render);
+  el.filter.addEventListener('change', render);
+  load();
+  setInterval(load, 60000);   // fetch a newer snapshot
+  setInterval(render, 1000);  // keep countdowns ticking in between
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,151 @@
+/* =========================================================================
+   ottomansfield.com  —  shared stylesheet
+   hand-coded, no build step. dark, calm, minimal.
+   all themeable values live in :root so the look swaps in one place.
+   ========================================================================= */
+
+:root {
+  /* --- colors: dark but simple. one muted accent, used sparingly. --- */
+  --bg:         #15161a;  /* near-black page background */
+  --panel:      #1e1f26;  /* content box background */
+  --border:     #33353f;  /* subtle box border */
+  --ink:        #e8e8ea;  /* main text */
+  --muted:      #9498a3;  /* secondary / footer text */
+  --accent:     #7ec7c2;  /* single muted teal accent, used sparingly */
+  --link:       #7ec7c2;
+  --link-hover: #a9e0db;
+
+  /* alt accents (swap --accent/--link/--link-hover to one of these if wanted):
+     warm amber  #e0b070  (hover #f0c890)
+     soft green  #8bd17c  (hover #a6e09a) */
+
+  /* --- fonts --- */
+  --font-display: "Silkscreen", "Pixelify Sans", ui-monospace, monospace;
+  --font-body:    "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  /* --- layout --- */
+  --maxw: 640px;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 17px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+img { max-width: 100%; display: block; image-rendering: pixelated; }
+
+a {
+  color: var(--link);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+}
+a:hover, a:focus { color: var(--link-hover); border-bottom-color: currentColor; }
+
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-bottom-color: transparent;
+}
+
+/* -------------------------------------------------------------------------
+   PAGE SHELL — single centered column
+   ------------------------------------------------------------------------- */
+.wrap {
+  max-width: var(--maxw);
+  margin: 0 auto;
+  padding: 64px 18px 48px;
+}
+
+/* -------------------------------------------------------------------------
+   HEADER / WORDMARK + NAV   (reusable — copy onto future pages)
+   ------------------------------------------------------------------------- */
+.site-header { text-align: center; margin-bottom: 36px; }
+
+.wordmark {
+  font-family: var(--font-display);
+  font-size: clamp(26px, 7vw, 38px);
+  font-weight: 400;
+  letter-spacing: 1px;
+  margin: 0;
+  color: var(--ink);
+}
+
+.nav {
+  margin-top: 16px;
+  font-size: 15px;
+  color: var(--muted);
+}
+.nav a {
+  color: var(--muted);
+  border-bottom: none;
+  padding: 0 2px;
+}
+.nav a:hover, .nav a:focus { color: var(--link-hover); }
+.nav a.active { color: var(--accent); }
+.nav .sep { color: var(--border); margin: 0 6px; }
+
+/* -------------------------------------------------------------------------
+   INTRO BOX — one light-chrome bordered panel with a small title strip
+   ------------------------------------------------------------------------- */
+.box {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  margin-bottom: 34px;
+  overflow: hidden;
+}
+.box__title {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--accent);
+  padding: 9px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.box__body { padding: 16px 18px; }
+.box__body p { margin: 0 0 .9em 0; }
+.box__body p:last-child { margin-bottom: 0; }
+
+/* -------------------------------------------------------------------------
+   LINK LIST — plain text links, no buttons
+   ------------------------------------------------------------------------- */
+.links { list-style: none; margin: 0; padding: 0; }
+.links li {
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+.links li:last-child { border-bottom: none; }
+.links a { font-size: 16px; }
+.links .label { color: var(--muted); font-size: 14px; margin-left: 8px; }
+
+.section-label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 1px;
+  color: var(--muted);
+  margin: 0 0 8px 2px;
+}
+
+/* -------------------------------------------------------------------------
+   FOOTER   (reusable — copy onto future pages)
+   ------------------------------------------------------------------------- */
+.site-footer {
+  margin-top: 48px;
+  text-align: center;
+  color: var(--muted);
+  font-size: 13px;
+}
+.site-footer a { color: var(--muted); }
+.site-footer a:hover { color: var(--link-hover); }
+
+/* small screens already comfortable at this width; just keep padding */
+@media (max-width: 480px) {
+  .wrap { padding: 44px 18px 40px; }
+}

@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "generatedAt": 1785768843064,
+  "newestSighting": null,
+  "window": {
+    "minHours": 0,
+    "maxHours": 48
+  },
+  "counts": {
+    "total": 0,
+    "forSale": 0,
+    "stale": 0,
+    "favourites": 0
+  },
+  "celler": []
+}

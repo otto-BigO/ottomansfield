@@ -115,10 +115,50 @@
     .note { color: var(--muted); font-size: 14px; margin-top: 14px; }
     .is-error { color: #e08080; }
 
+    /* Loading ---------------------------------------------------------------
+       There are close to two thousand celler and building their cards takes a
+       noticeable moment, so the page says it is working instead of sitting
+       blank and looking broken. */
+    .loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+      padding: 56px 0 48px;
+      color: var(--muted);
+    }
+    .loading[hidden] { display: none; }
+
+    .spinner {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      /* A ring that is mostly track, with one bright arc travelling round it. */
+      border: 2.5px solid var(--border);
+      border-top-color: var(--accent);
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading__text {
+      font-size: 14px;
+      letter-spacing: .02em;
+      /* Fades in and out so a long wait still looks alive. */
+      animation: loading-breathe 1.8s ease-in-out infinite;
+    }
+    @keyframes loading-breathe { 0%, 100% { opacity: .55; } 50% { opacity: 1; } }
+
+    /* The list fades in once, so the cards arrive rather than snapping in. */
+    .celle-list.is-ready { animation: list-in .32s ease-out; }
+    @keyframes list-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
     @media (prefers-reduced-motion: reduce) {
       .celle, .celle__bar i, .stat, .controls input, .controls select { transition: none; }
       .celle.is-entering, .celle.is-changed, .celle.is-free .celle__time { animation: none; }
       .celle:hover { transform: none; }
+      /* The spinner still turns, just slowly enough not to be a trigger. */
+      .spinner { animation-duration: 2s; }
+      .loading__text, .celle-list.is-ready { animation: none; }
     }
   </style>
 </head>
@@ -164,6 +204,11 @@
       </select>
     </div>
 
+    <div class="loading" id="loading" role="status" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <div class="loading__text" id="loading-text">henter celler…</div>
+    </div>
+
     <ul class="celle-list" id="rows"></ul>
     <p class="empty" id="empty" hidden>ingen celler matcher.</p>
 
@@ -195,8 +240,42 @@
     note: document.getElementById('note'),
     q: document.getElementById('q'),
     filter: document.getElementById('filter'),
-    sort: document.getElementById('sort')
+    sort: document.getElementById('sort'),
+    loading: document.getElementById('loading'),
+    loadingText: document.getElementById('loading-text')
   };
+
+  /** False until the first render has finished and the list has been revealed. */
+  var booted = false;
+
+  function finishLoading() {
+    if (booted) return;
+    booted = true;
+    el.loading.hidden = true;
+    el.rows.classList.add('is-ready');
+  }
+
+  /**
+   * Runs fn after the browser has actually painted. Building the cards blocks
+   * the main thread, so calling render() straight off the fetch meant the
+   * spinner was never drawn even once: the page went from blank to finished.
+   * Two frames is the reliable way to get a paint in first.
+   *
+   * The timer is not belt and braces. A background tab runs no animation frames
+   * at all, so on rAF alone a page opened in a new tab sat on the spinner
+   * indefinitely and only built its list when the tab was first looked at.
+   * Whichever comes first wins, and in a visible tab that is always the frames.
+   */
+  function afterPaint(fn) {
+    var ran = false;
+    function once() {
+      if (ran) return;
+      ran = true;
+      fn();
+    }
+    requestAnimationFrame(function () { requestAnimationFrame(once); });
+    setTimeout(once, 250);
+  }
 
   /** Live card nodes keyed by celle id, so they are updated rather than rebuilt. */
   var nodes = {};
@@ -457,10 +536,23 @@
         if (!r.ok) throw new Error('HTTP ' + r.status);
         return r.json();
       })
-      .then(function (j) { data = j; render(); })
+      .then(function (j) {
+        if (booted) { data = j; render(); return; }
+        // The download is the quick part. Say what the slow part is doing.
+        var n = j && j.celler ? j.celler.length : 0;
+        el.loadingText.textContent = 'bygger ' + n + ' celler…';
+        afterPaint(function () {
+          data = j;
+          render();
+          finishLoading();
+        });
+      })
       .catch(function (e) {
         el.fresh.className = 'is-error';
         el.fresh.textContent = 'could not load data (' + e.message + ').';
+        // Never leave it spinning on a failure, or it looks like it is still trying.
+        el.loading.hidden = true;
+        booted = true;
       });
   }
 

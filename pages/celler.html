@@ -158,7 +158,19 @@
     /* Sits above the stats now, so the gap goes underneath it. */
     .chart-box { margin: 0 0 18px; }
     .chart-box[hidden] { display: none; }
-    .chart__intro { color: var(--muted); font-size: 14px; margin: 0 0 14px; }
+    .chart__head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap; margin: 0 0 14px;
+    }
+    .chart__intro { color: var(--muted); font-size: 14px; margin: 0; }
+    .chart__range { display: flex; gap: 6px; flex: 0 0 auto; }
+    .rangebtn {
+      background: var(--panel); border: 1px solid var(--border); color: var(--muted);
+      border-radius: 6px; padding: 4px 11px; font-family: var(--font-body); font-size: 13px;
+      cursor: pointer; transition: border-color .18s ease, color .18s ease;
+    }
+    .rangebtn:hover { border-color: var(--muted); color: var(--ink); }
+    .rangebtn.is-on { border-color: var(--accent); color: var(--accent); }
     .chart__intro span { color: var(--ink); }
 
     .chart__wrap { position: relative; }
@@ -259,10 +271,16 @@
     <section class="box chart-box" id="chart-box" aria-labelledby="chart-h" hidden>
       <div class="box__title" id="chart-h">vækst</div>
       <div class="box__body">
-        <p class="chart__intro">
-          hvor mange celler botten kender, dag for dag.
-          <span id="chart-summary"></span>
-        </p>
+        <div class="chart__head">
+          <p class="chart__intro">
+            hvor mange celler botten kender.
+            <span id="chart-summary"></span>
+          </p>
+          <div class="chart__range" role="group" aria-label="opløsning">
+            <button type="button" id="range-hours" class="rangebtn">timer</button>
+            <button type="button" id="range-days" class="rangebtn is-on">dage</button>
+          </div>
+        </div>
         <div class="chart__wrap">
           <svg id="chart" class="chart" viewBox="0 0 640 220" preserveAspectRatio="none"
                role="img" aria-labelledby="chart-title">
@@ -660,6 +678,32 @@
      heaviest thing on it by a wide margin. */
   var CHART = { w: 640, h: 220, padL: 44, padR: 10, padT: 12, padB: 24 };
 
+  /** 'days' or 'hours'. Remembered like the list's view settings. */
+  var chartRange = 'days';
+  try { chartRange = localStorage.getItem('celler.chartRange') || 'days'; } catch (e) {}
+
+  /** The rows and labels for the current resolution. */
+  function chartRows() {
+    if (!data) return { rows: [], label: function () { return ''; }, unit: '' };
+    if (chartRange === 'hours') {
+      return {
+        rows: (data.hourly || []).map(function (h) {
+          return { key: h.hour, total: h.total, confirmed: h.confirmed, forSale: h.forSale };
+        }),
+        // "2026-08-05T14" -> "14:00"
+        label: function (k) { return k.slice(11) + ':00'; },
+        unit: 'timer',
+      };
+    }
+    return {
+      rows: (data.history || []).map(function (d) {
+        return { key: d.day, total: d.total, confirmed: d.confirmed, forSale: d.forSale };
+      }),
+      label: function (k) { return k.slice(5); },
+      unit: 'dage',
+    };
+  }
+
   function niceMax(v) {
     if (v <= 10) return 10;
     var mag = Math.pow(10, Math.floor(Math.log(v) / Math.LN10));
@@ -688,7 +732,8 @@
     var tip = document.getElementById('chart-tip');
     if (!box || !svg) return;
 
-    var rows = (data && data.history) || [];
+    var src = chartRows();
+    var rows = src.rows;
     if (!rows.length) {
       // Nothing logged yet: hide the whole card rather than show an empty frame.
       box.hidden = true;
@@ -701,18 +746,20 @@
     var summary = document.getElementById('chart-summary');
     var last = rows[rows.length - 1];
     if (rows.length === 1) {
-      summary.textContent = 'kun én dag indtil videre, så der er ikke en kurve endnu.';
+      summary.textContent = chartRange === 'hours'
+        ? 'kun én time indtil videre, så der er ikke en kurve endnu.'
+        : 'kun én dag indtil videre, så der er ikke en kurve endnu.';
       var only = svgEl('text', {
         x: CHART.w / 2, y: CHART.h / 2, 'text-anchor': 'middle', class: 'axis-label',
       });
-      only.textContent = last.day + ': ' + last.total + ' celler';
+      only.textContent = src.label(last.key) + ': ' + last.total + ' celler';
       svg.appendChild(only);
       return;
     }
     var diff = last.total - rows[0].total;
     summary.textContent = diff === 0
-      ? 'uændret over ' + rows.length + ' dage.'
-      : (diff > 0 ? '+' : '') + diff + ' over ' + rows.length + ' dage.';
+      ? 'uændret over ' + rows.length + ' ' + src.unit + '.'
+      : (diff > 0 ? '+' : '') + diff + ' over ' + rows.length + ' ' + src.unit + '.';
 
     var max = niceMax(Math.max.apply(null, rows.map(function (r) { return r.total; })));
     var innerW = CHART.w - CHART.padL - CHART.padR;
@@ -742,10 +789,10 @@
 
     // First and last date under the axis. Every label would be unreadable.
     var d0 = svgEl('text', { x: x(0), y: CHART.h - 6, class: 'axis-label' });
-    d0.textContent = rows[0].day.slice(5);
+    d0.textContent = src.label(rows[0].key);
     svg.appendChild(d0);
     var d1 = svgEl('text', { x: x(rows.length - 1), y: CHART.h - 6, 'text-anchor': 'end', class: 'axis-label' });
-    d1.textContent = last.day.slice(5);
+    d1.textContent = src.label(last.key);
     svg.appendChild(d1);
 
     // A dot on the latest point, so "where are we now" is obvious.
@@ -765,7 +812,7 @@
     function showTip(r, px, py) {
       tip.innerHTML = '<b>' + r.total + '</b> kendte<br>'
         + '<span class="muted">' + r.confirmed + ' bekræftet, ' + r.forSale + ' til salg</span><br>'
-        + '<span class="muted">' + r.day + '</span>';
+        + '<span class="muted">' + src.label(r.key) + '</span>';
       // The svg is scaled to the box, so map viewBox units back to pixels.
       var rect = svg.getBoundingClientRect();
       tip.style.left = (px / CHART.w * rect.width) + 'px';
@@ -773,6 +820,21 @@
       tip.hidden = false;
     }
   }
+
+  function setChartRange(next) {
+    if (chartRange === next) return;
+    chartRange = next;
+    try { localStorage.setItem('celler.chartRange', next); } catch (e) {}
+    document.getElementById('range-hours').classList.toggle('is-on', next === 'hours');
+    document.getElementById('range-days').classList.toggle('is-on', next === 'days');
+    renderChart();
+  }
+
+  document.getElementById('range-hours').addEventListener('click', function () { setChartRange('hours'); });
+  document.getElementById('range-days').addEventListener('click', function () { setChartRange('days'); });
+  // Reflect the remembered choice on the buttons before the first draw.
+  document.getElementById('range-hours').classList.toggle('is-on', chartRange === 'hours');
+  document.getElementById('range-days').classList.toggle('is-on', chartRange === 'days');
 
   function onControlChange() { saveView(); render(); }
 

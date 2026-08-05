@@ -155,7 +155,8 @@
     /* Growth chart ----------------------------------------------------------
        A filled area for the running total with two thinner lines over it, so
        the shape reads at a glance and the detail is there if you look. */
-    .chart-box { margin-top: 22px; }
+    /* Sits above the stats now, so the gap goes underneath it. */
+    .chart-box { margin: 0 0 18px; }
     .chart-box[hidden] { display: none; }
     .chart__intro { color: var(--muted); font-size: 14px; margin: 0 0 14px; }
     .chart__intro span { color: var(--ink); }
@@ -254,6 +255,30 @@
       </div>
     </section>
 
+    <!-- GROWTH CHART START  ===================================== -->
+    <section class="box chart-box" id="chart-box" aria-labelledby="chart-h" hidden>
+      <div class="box__title" id="chart-h">vækst</div>
+      <div class="box__body">
+        <p class="chart__intro">
+          hvor mange celler botten kender, dag for dag.
+          <span id="chart-summary"></span>
+        </p>
+        <div class="chart__wrap">
+          <svg id="chart" class="chart" viewBox="0 0 640 220" preserveAspectRatio="none"
+               role="img" aria-labelledby="chart-title">
+            <title id="chart-title">celler kendt pr. dag</title>
+          </svg>
+          <div class="chart__tip" id="chart-tip" hidden></div>
+        </div>
+        <ul class="chart__key">
+          <li><i class="k k--total"></i>kendte i alt</li>
+          <li><i class="k k--conf"></i>med bekræftet timer</li>
+          <li><i class="k k--sale"></i>til salg</li>
+        </ul>
+      </div>
+    </section>
+    <!-- GROWTH CHART END  ======================================= -->
+
     <ul class="stat-row" id="stats"></ul>
 
     <div class="controls">
@@ -282,29 +307,6 @@
 
     <p class="note" id="note"></p>
 
-    <!-- GROWTH CHART START  ===================================== -->
-    <section class="box chart-box" id="chart-box" aria-labelledby="chart-h" hidden>
-      <div class="box__title" id="chart-h">vækst</div>
-      <div class="box__body">
-        <p class="chart__intro">
-          hvor mange celler botten kender, dag for dag.
-          <span id="chart-summary"></span>
-        </p>
-        <div class="chart__wrap">
-          <svg id="chart" class="chart" viewBox="0 0 640 220" preserveAspectRatio="none"
-               role="img" aria-labelledby="chart-title">
-            <title id="chart-title">celler kendt pr. dag</title>
-          </svg>
-          <div class="chart__tip" id="chart-tip" hidden></div>
-        </div>
-        <ul class="chart__key">
-          <li><i class="k k--total"></i>kendte i alt</li>
-          <li><i class="k k--conf"></i>med bekræftet timer</li>
-          <li><i class="k k--sale"></i>til salg</li>
-        </ul>
-      </div>
-    </section>
-    <!-- GROWTH CHART END  ======================================= -->
 
   </main>
 

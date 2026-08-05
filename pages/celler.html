@@ -152,6 +152,74 @@
     .celle-list.is-ready { animation: list-in .32s ease-out; }
     @keyframes list-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 
+    /* Growth chart ----------------------------------------------------------
+       A filled area for the running total with two thinner lines over it, so
+       the shape reads at a glance and the detail is there if you look. */
+    .chart-box { margin-top: 22px; }
+    .chart-box[hidden] { display: none; }
+    .chart__intro { color: var(--muted); font-size: 14px; margin: 0 0 14px; }
+    .chart__intro span { color: var(--ink); }
+
+    .chart__wrap { position: relative; }
+    .chart {
+      width: 100%;
+      height: 220px;
+      display: block;
+      overflow: visible;
+    }
+
+    .chart .grid { stroke: var(--border); stroke-width: 1; }
+    .chart .axis-label { fill: var(--muted); font-size: 11px; font-family: var(--font-body); }
+
+    .chart .area { fill: var(--accent); opacity: .12; }
+    .chart .line-total { fill: none; stroke: var(--accent); stroke-width: 2; }
+    .chart .line-conf  { fill: none; stroke: var(--ink); stroke-width: 1.25; opacity: .45; }
+    .chart .line-sale  { fill: none; stroke: #e0a86a; stroke-width: 1.25; opacity: .75; }
+
+    .chart .dot { fill: var(--accent); }
+    /* One wide invisible band per day, so hovering anywhere in the column works
+       rather than needing to hit a 3px dot. */
+    .chart .hit { fill: transparent; }
+    .chart .hit:hover ~ .cursor, .chart .hit.is-on ~ .cursor { opacity: 1; }
+    .chart .cursor { stroke: var(--muted); stroke-width: 1; opacity: 0; }
+
+    .chart__tip {
+      position: absolute;
+      pointer-events: none;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 7px 10px;
+      font-size: 13px;
+      line-height: 1.45;
+      color: var(--ink);
+      white-space: nowrap;
+      transform: translate(-50%, -110%);
+      z-index: 2;
+    }
+    .chart__tip[hidden] { display: none; }
+    .chart__tip b { color: var(--accent); }
+    .chart__tip .muted { color: var(--muted); }
+
+    .chart__key {
+      list-style: none;
+      margin: 14px 0 0;
+      padding: 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px 18px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .chart__key li { display: flex; align-items: center; gap: 7px; }
+    .chart__key .k { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+    .chart__key .k--total { background: var(--accent); }
+    .chart__key .k--conf  { background: var(--ink); opacity: .45; }
+    .chart__key .k--sale  { background: #e0a86a; }
+
+    /* One day is a dot, not a line, so say so rather than drawing nothing. */
+    .chart__empty { color: var(--muted); font-size: 14px; padding: 26px 0; text-align: center; }
+
     @media (prefers-reduced-motion: reduce) {
       .celle, .celle__bar i, .stat, .controls input, .controls select { transition: none; }
       .celle.is-entering, .celle.is-changed, .celle.is-free .celle__time { animation: none; }
@@ -213,6 +281,30 @@
     <p class="empty" id="empty" hidden>ingen celler matcher.</p>
 
     <p class="note" id="note"></p>
+
+    <!-- GROWTH CHART START  ===================================== -->
+    <section class="box chart-box" id="chart-box" aria-labelledby="chart-h" hidden>
+      <div class="box__title" id="chart-h">vækst</div>
+      <div class="box__body">
+        <p class="chart__intro">
+          hvor mange celler botten kender, dag for dag.
+          <span id="chart-summary"></span>
+        </p>
+        <div class="chart__wrap">
+          <svg id="chart" class="chart" viewBox="0 0 640 220" preserveAspectRatio="none"
+               role="img" aria-labelledby="chart-title">
+            <title id="chart-title">celler kendt pr. dag</title>
+          </svg>
+          <div class="chart__tip" id="chart-tip" hidden></div>
+        </div>
+        <ul class="chart__key">
+          <li><i class="k k--total"></i>kendte i alt</li>
+          <li><i class="k k--conf"></i>med bekræftet timer</li>
+          <li><i class="k k--sale"></i>til salg</li>
+        </ul>
+      </div>
+    </section>
+    <!-- GROWTH CHART END  ======================================= -->
 
   </main>
 
@@ -537,13 +629,17 @@
         return r.json();
       })
       .then(function (j) {
-        if (booted) { data = j; render(); return; }
+        // The chart is redrawn only when new data lands, never on the 1 Hz
+        // countdown tick: nothing in it changes per second, and rebuilding the
+        // nodes would kill any tooltip the pointer was sitting on.
+        if (booted) { data = j; render(); renderChart(); return; }
         // The download is the quick part. Say what the slow part is doing.
         var n = j && j.celler ? j.celler.length : 0;
         el.loadingText.textContent = 'bygger ' + n + ' celler…';
         afterPaint(function () {
           data = j;
           render();
+          renderChart();
           finishLoading();
         });
       })
@@ -554,6 +650,126 @@
         el.loading.hidden = true;
         booted = true;
       });
+  }
+
+  /* Growth chart -----------------------------------------------------------
+     Hand-drawn SVG rather than a charting library, because the page is static,
+     served from the same box, and pulling in a CDN for one chart would be the
+     heaviest thing on it by a wide margin. */
+  var CHART = { w: 640, h: 220, padL: 44, padR: 10, padT: 12, padB: 24 };
+
+  function niceMax(v) {
+    if (v <= 10) return 10;
+    var mag = Math.pow(10, Math.floor(Math.log(v) / Math.LN10));
+    var n = Math.ceil(v / mag) * mag;
+    // Half steps keep the top gridline close to the data instead of miles above.
+    return (n - v > mag / 2) ? n - mag / 2 : n;
+  }
+
+  function svgEl(name, attrs) {
+    var e = document.createElementNS('http://www.w3.org/2000/svg', name);
+    for (var k in attrs) if (attrs.hasOwnProperty(k)) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  function pathFor(rows, key, x, y) {
+    var d = '';
+    for (var i = 0; i < rows.length; i++) {
+      d += (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(rows[i][key]).toFixed(1) + ' ';
+    }
+    return d.trim();
+  }
+
+  function renderChart() {
+    var box = document.getElementById('chart-box');
+    var svg = document.getElementById('chart');
+    var tip = document.getElementById('chart-tip');
+    if (!box || !svg) return;
+
+    var rows = (data && data.history) || [];
+    if (!rows.length) {
+      // Nothing logged yet: hide the whole card rather than show an empty frame.
+      box.hidden = true;
+      return;
+    }
+    box.hidden = false;
+    while (svg.firstChild && svg.firstChild.nodeName !== 'title') svg.removeChild(svg.firstChild);
+    while (svg.childNodes.length > 1) svg.removeChild(svg.lastChild);
+
+    var summary = document.getElementById('chart-summary');
+    var last = rows[rows.length - 1];
+    if (rows.length === 1) {
+      summary.textContent = 'kun én dag indtil videre, så der er ikke en kurve endnu.';
+      var only = svgEl('text', {
+        x: CHART.w / 2, y: CHART.h / 2, 'text-anchor': 'middle', class: 'axis-label',
+      });
+      only.textContent = last.day + ': ' + last.total + ' celler';
+      svg.appendChild(only);
+      return;
+    }
+    var diff = last.total - rows[0].total;
+    summary.textContent = diff === 0
+      ? 'uændret over ' + rows.length + ' dage.'
+      : (diff > 0 ? '+' : '') + diff + ' over ' + rows.length + ' dage.';
+
+    var max = niceMax(Math.max.apply(null, rows.map(function (r) { return r.total; })));
+    var innerW = CHART.w - CHART.padL - CHART.padR;
+    var innerH = CHART.h - CHART.padT - CHART.padB;
+    var x = function (i) { return CHART.padL + (rows.length === 1 ? innerW / 2 : (i / (rows.length - 1)) * innerW); };
+    var y = function (v) { return CHART.padT + innerH - (Math.min(v, max) / max) * innerH; };
+
+    // Gridlines and their labels.
+    for (var g = 0; g <= 4; g++) {
+      var val = (max / 4) * g;
+      var gy = y(val);
+      svg.appendChild(svgEl('line', { x1: CHART.padL, y1: gy, x2: CHART.w - CHART.padR, y2: gy, class: 'grid' }));
+      var lbl = svgEl('text', { x: CHART.padL - 8, y: gy + 4, 'text-anchor': 'end', class: 'axis-label' });
+      lbl.textContent = Math.round(val);
+      svg.appendChild(lbl);
+    }
+
+    // Filled area under the running total.
+    var area = pathFor(rows, 'total', x, y)
+      + ' L' + x(rows.length - 1).toFixed(1) + ' ' + (CHART.padT + innerH)
+      + ' L' + x(0).toFixed(1) + ' ' + (CHART.padT + innerH) + ' Z';
+    svg.appendChild(svgEl('path', { d: area, class: 'area' }));
+
+    svg.appendChild(svgEl('path', { d: pathFor(rows, 'confirmed', x, y), class: 'line-conf' }));
+    svg.appendChild(svgEl('path', { d: pathFor(rows, 'forSale', x, y), class: 'line-sale' }));
+    svg.appendChild(svgEl('path', { d: pathFor(rows, 'total', x, y), class: 'line-total' }));
+
+    // First and last date under the axis. Every label would be unreadable.
+    var d0 = svgEl('text', { x: x(0), y: CHART.h - 6, class: 'axis-label' });
+    d0.textContent = rows[0].day.slice(5);
+    svg.appendChild(d0);
+    var d1 = svgEl('text', { x: x(rows.length - 1), y: CHART.h - 6, 'text-anchor': 'end', class: 'axis-label' });
+    d1.textContent = last.day.slice(5);
+    svg.appendChild(d1);
+
+    // A dot on the latest point, so "where are we now" is obvious.
+    svg.appendChild(svgEl('circle', { cx: x(rows.length - 1), cy: y(last.total), r: 3.5, class: 'dot' }));
+
+    // Hover: a full-height band per day beats trying to hit a 3px dot.
+    var bandW = innerW / Math.max(1, rows.length - 1);
+    rows.forEach(function (r, i) {
+      var hit = svgEl('rect', {
+        x: x(i) - bandW / 2, y: CHART.padT, width: bandW, height: innerH, class: 'hit',
+      });
+      hit.addEventListener('mouseenter', function () { showTip(r, x(i), y(r.total)); });
+      hit.addEventListener('mouseleave', function () { tip.hidden = true; });
+      svg.appendChild(hit);
+    });
+
+    function showTip(r, px, py) {
+      tip.innerHTML = '<b>' + r.total + '</b> kendte<br>'
+        + '<span class="muted">' + r.confirmed + ' bekræftet, ' + r.forSale + ' til salg</span><br>'
+        + '<span class="muted">' + r.day + '</span>';
+      // The svg is scaled to the box, so map viewBox units back to pixels.
+      var rect = svg.getBoundingClientRect();
+      tip.style.left = (px / CHART.w * rect.width) + 'px';
+      tip.style.top = (py / CHART.h * rect.height) + 'px';
+      tip.hidden = false;
+    }
   }
 
   function onControlChange() { saveView(); render(); }

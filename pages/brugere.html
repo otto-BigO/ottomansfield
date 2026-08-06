@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <title>brugere ~ Ottomansfield</title>
+  <meta name="description" content="everyone running the freakyville celle scanner mod.">
+
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon-16.png">
+
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="brugere ~ Ottomansfield">
+  <meta property="og:description" content="everyone running the celle scanner mod.">
+  <meta property="og:url" content="https://ottomansfield.com/pages/brugere.html">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="/css/style.css">
+
+  <style>
+    .users__intro { color: var(--muted); font-size: 14px; margin: 0 0 14px; }
+    .users__intro span { color: var(--ink); }
+
+    .users {
+      list-style: none; margin: 0; padding: 0;
+      display: grid; gap: 8px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    @media (max-width: 900px) { .users { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 560px) { .users { grid-template-columns: 1fr; } }
+
+    .user {
+      display: flex; align-items: center; gap: 9px;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      transition: transform .16s ease, border-color .2s ease;
+    }
+    .user:hover { transform: translateY(-2px); border-color: var(--muted); }
+    .user.is-live { border-left-color: var(--accent); }
+
+    /* The head renders from the username, so a missing avatar is just a gap. */
+    .user__head {
+      width: 24px; height: 24px; flex: 0 0 24px;
+      border-radius: 4px;
+      image-rendering: pixelated;
+      background: var(--border);
+    }
+    .user__body { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+    .user__name {
+      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      font-size: 14px; color: var(--ink);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .user__meta { color: var(--muted); font-size: 12px; white-space: nowrap; }
+    .user.is-live .user__meta { color: var(--accent); }
+
+    .box + .box { margin-top: 22px; }
+    .note { color: var(--muted); font-size: 14px; margin-top: 14px; }
+    .is-error { color: #e08080; }
+    .empty { color: var(--muted); padding: 18px 4px; }
+
+    .loading { display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 56px 0 48px; color: var(--muted); }
+    .loading[hidden] { display: none; }
+    .spinner {
+      width: 34px; height: 34px; border-radius: 50%;
+      border: 2.5px solid var(--border); border-top-color: var(--accent);
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .spinner { animation-duration: 2s; }
+      .user:hover { transform: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- HEADER START  ============================================ -->
+  <header class="site-header">
+    <h1 class="wordmark">ottomansfield</h1>
+    <nav class="nav" aria-label="main">
+      <a href="/">home</a>
+      <span class="sep" aria-hidden="true">·</span>
+      <a href="/pages/celler.html">celler</a>
+          <span class="sep" aria-hidden="true">·</span>
+      <a href="/pages/brugere.html" class="active">brugere</a>
+    </nav>
+  </header>
+  <!-- HEADER END  ============================================== -->
+
+  <main>
+
+    <section class="box" aria-labelledby="brugere-h">
+      <div class="box__title" id="brugere-h">brugere</div>
+      <div class="box__body">
+        <p>alle der kører celle scanner modet. <span id="freshness">loading…</span></p>
+      </div>
+    </section>
+
+    <div class="loading" id="loading" role="status" aria-live="polite">
+      <div class="spinner" aria-hidden="true"></div>
+      <div>henter brugere…</div>
+    </div>
+
+    <section class="box" id="live-box" aria-labelledby="live-h" hidden>
+      <div class="box__title" id="live-h">aktive nu</div>
+      <div class="box__body">
+        <p class="users__intro">set inden for den sidste halve time. <span id="live-count"></span></p>
+        <ul class="users" id="live"></ul>
+      </div>
+    </section>
+
+    <section class="box" id="all-box" aria-labelledby="all-h" hidden>
+      <div class="box__title" id="all-h">har brugt modet</div>
+      <div class="box__body">
+        <p class="users__intro">alle der nogensinde har sendt data ind. <span id="all-count"></span></p>
+        <ul class="users" id="all"></ul>
+      </div>
+    </section>
+
+    <p class="empty" id="empty" hidden>ingen har sendt data ind endnu.</p>
+    <p class="note" id="note"></p>
+
+  </main>
+
+  <!-- FOOTER START  ============================================ -->
+  <footer class="site-footer">
+    <p>coded by hand, 2026</p>
+  </footer>
+  <!-- FOOTER END  ============================================== -->
+
+</div>
+
+<script>
+(function () {
+  var DATA_URL = '/data/celler.json';
+  var LIVE_MS = 30 * 60 * 1000;
+
+  var el = {
+    live: document.getElementById('live'),
+    all: document.getElementById('all'),
+    liveBox: document.getElementById('live-box'),
+    allBox: document.getElementById('all-box'),
+    liveCount: document.getElementById('live-count'),
+    allCount: document.getElementById('all-count'),
+    fresh: document.getElementById('freshness'),
+    note: document.getElementById('note'),
+    empty: document.getElementById('empty'),
+    loading: document.getElementById('loading')
+  };
+
+  function age(ts) {
+    if (!ts) return 'unknown';
+    var ms = Date.now() - ts;
+    if (ms < 60000) return 'just now';
+    var mins = Math.floor(ms / 60000);
+    if (mins < 60) return mins + 'm ago';
+    var hours = Math.floor(mins / 60);
+    if (hours < 24) return hours + 'h ago';
+    return Math.floor(hours / 24) + 'd ago';
+  }
+
+  function card(u, now) {
+    var li = document.createElement('li');
+    var live = now - u.lastSeen < LIVE_MS;
+    li.className = 'user' + (live ? ' is-live' : '');
+
+    var img = document.createElement('img');
+    img.className = 'user__head';
+    img.alt = '';
+    img.loading = 'lazy';
+    img.src = 'https://minotar.net/helm/' + encodeURIComponent(u.name) + '/24.png';
+    img.addEventListener('error', function () { this.style.visibility = 'hidden'; });
+    li.appendChild(img);
+
+    var body = document.createElement('div');
+    body.className = 'user__body';
+
+    var name = document.createElement('span');
+    name.className = 'user__name';
+    name.textContent = u.name;
+    body.appendChild(name);
+
+    var meta = document.createElement('span');
+    meta.className = 'user__meta';
+    meta.textContent = (live ? 'aktiv nu' : 'sidst ' + age(u.lastSeen))
+      + ' · ' + u.reports + (u.reports === 1 ? ' rapport' : ' rapporter');
+    body.appendChild(meta);
+
+    li.appendChild(body);
+    return li;
+  }
+
+  function render(data) {
+    var users = (data && data.users) || [];
+    el.loading.hidden = true;
+
+    if (!users.length) {
+      el.empty.hidden = false;
+      el.fresh.textContent = 'ingen endnu.';
+      return;
+    }
+
+    var now = Date.now();
+    var live = users.filter(function (u) { return now - u.lastSeen < LIVE_MS; });
+
+    el.fresh.textContent = users.length + (users.length === 1 ? ' bruger' : ' brugere') + ' i alt.';
+
+    if (live.length) {
+      el.liveBox.hidden = false;
+      el.liveCount.textContent = live.length + (live.length === 1 ? ' bruger' : ' brugere') + '.';
+      el.live.innerHTML = '';
+      live.forEach(function (u) { el.live.appendChild(card(u, now)); });
+    }
+
+    el.allBox.hidden = false;
+    el.allCount.textContent = users.length + (users.length === 1 ? ' bruger' : ' brugere') + '.';
+    el.all.innerHTML = '';
+    users.forEach(function (u) { el.all.appendChild(card(u, now)); });
+
+    el.note.textContent = 'opdateret ' + age(data.generatedAt) + '.';
+  }
+
+  function load() {
+    fetch(DATA_URL + '?t=' + Date.now(), { cache: 'no-store' })
+      .then(function (r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(render)
+      .catch(function (e) {
+        el.loading.hidden = true;
+        el.fresh.className = 'is-error';
+        el.fresh.textContent = 'kunne ikke hente data (' + e.message + ').';
+      });
+  }
+
+  load();
+  setInterval(load, 60000);
+})();
+</script>
+</body>
+</html>

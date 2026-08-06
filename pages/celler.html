@@ -230,44 +230,6 @@
     .chart__key .k--conf  { background: var(--ink); opacity: .45; }
     .chart__key .k--sale  { background: #e0a86a; }
 
-    /* Who is scanning ------------------------------------------------------- */
-    .users-box { margin-top: 22px; }
-    .users-box[hidden] { display: none; }
-    .users__intro { color: var(--muted); font-size: 14px; margin: 0 0 14px; }
-    .users__intro span { color: var(--ink); }
-
-    .users {
-      list-style: none; margin: 0; padding: 0;
-      display: grid; gap: 8px;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-    }
-    @media (max-width: 900px) { .users { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    @media (max-width: 560px) { .users { grid-template-columns: 1fr; } }
-
-    .user {
-      display: flex; align-items: center; gap: 9px;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 8px 10px;
-      transition: border-color .2s ease;
-    }
-    .user:hover { border-color: var(--muted); }
-    /* The head renders from the username, so a missing avatar is just a gap. */
-    .user__head {
-      width: 22px; height: 22px; flex: 0 0 22px;
-      border-radius: 4px;
-      image-rendering: pixelated;
-      background: var(--border);
-    }
-    .user__name {
-      font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-      font-size: 14px; color: var(--ink);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .user__seen { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
-    .user.is-live .user__seen { color: var(--accent); }
-
     /* One day is a dot, not a line, so say so rather than drawing nothing. */
     .chart__empty { color: var(--muted); font-size: 14px; padding: 26px 0; text-align: center; }
 
@@ -291,6 +253,8 @@
       <a href="/">home</a>
       <span class="sep" aria-hidden="true">·</span>
       <a href="/pages/celler.html" class="active">celler</a>
+      <span class="sep" aria-hidden="true">·</span>
+      <a href="/pages/brugere.html">brugere</a>
     </nav>
   </header>
   <!-- HEADER END  ============================================== -->
@@ -363,18 +327,6 @@
 
     <p class="note" id="note"></p>
 
-    <!-- USERS START  =========================================== -->
-    <section class="box users-box" id="users-box" aria-labelledby="users-h" hidden>
-      <div class="box__title" id="users-h">hvem scanner</div>
-      <div class="box__body">
-        <p class="users__intro">
-          alle der kører modet og har sendt data ind.
-          <span id="users-count"></span>
-        </p>
-        <ul class="users" id="users"></ul>
-      </div>
-    </section>
-    <!-- USERS END  ============================================= -->
 
 
   </main>
@@ -404,9 +356,6 @@
     q: document.getElementById('q'),
     filter: document.getElementById('filter'),
     sort: document.getElementById('sort'),
-    usersBox: document.getElementById('users-box'),
-    users: document.getElementById('users'),
-    usersCount: document.getElementById('users-count'),
     loading: document.getElementById('loading'),
     loadingText: document.getElementById('loading-text')
   };
@@ -706,7 +655,7 @@
         // The chart is redrawn only when new data lands, never on the 1 Hz
         // countdown tick: nothing in it changes per second, and rebuilding the
         // nodes would kill any tooltip the pointer was sitting on.
-        if (booted) { data = j; render(); renderChart(); renderUsers(); return; }
+        if (booted) { data = j; render(); renderChart(); return; }
         // The download is the quick part. Say what the slow part is doing.
         var n = j && j.celler ? j.celler.length : 0;
         el.loadingText.textContent = 'bygger ' + n + ' celler…';
@@ -714,7 +663,6 @@
           data = j;
           render();
           renderChart();
-          renderUsers();
           finishLoading();
         });
       })
@@ -890,54 +838,6 @@
   // Reflect the remembered choice on the buttons before the first draw.
   document.getElementById('range-hours').classList.toggle('is-on', chartRange === 'hours');
   document.getElementById('range-days').classList.toggle('is-on', chartRange === 'days');
-
-  /* Who is scanning ---------------------------------------------------------
-     Rebuilt only when new data lands, like the chart, since the list changes
-     about as often as somebody logs in. */
-  function renderUsers() {
-    var box = el.usersBox;
-    if (!box) return;
-    var list = (data && data.users) || [];
-    if (!list.length) {
-      box.hidden = true;
-      return;
-    }
-    box.hidden = false;
-
-    var now = Date.now();
-    var live = list.filter(function (u) { return now - u.lastSeen < 30 * 60 * 1000; }).length;
-    el.usersCount.textContent = list.length + (list.length === 1 ? ' bruger' : ' brugere')
-      + (live ? ', ' + live + ' aktiv' + (live === 1 ? '' : 'e') + ' den sidste halve time' : '') + '.';
-
-    el.users.innerHTML = '';
-    for (var i = 0; i < list.length; i++) {
-      var u = list[i];
-      var li = document.createElement('li');
-      li.className = 'user' + (now - u.lastSeen < 30 * 60 * 1000 ? ' is-live' : '');
-
-      // Head render straight from the username. If it fails to load the box
-      // just stays the placeholder colour rather than showing a broken image.
-      var img = document.createElement('img');
-      img.className = 'user__head';
-      img.alt = '';
-      img.loading = 'lazy';
-      img.src = 'https://minotar.net/helm/' + encodeURIComponent(u.name) + '/22.png';
-      img.addEventListener('error', function () { this.style.visibility = 'hidden'; });
-      li.appendChild(img);
-
-      var name = document.createElement('span');
-      name.className = 'user__name';
-      name.textContent = u.name;
-      li.appendChild(name);
-
-      var seen = document.createElement('span');
-      seen.className = 'user__seen';
-      seen.textContent = age(u.lastSeen);
-      li.appendChild(seen);
-
-      el.users.appendChild(li);
-    }
-  }
 
   function onControlChange() { saveView(); render(); }
 
